@@ -1,6 +1,7 @@
 import { Diff2HtmlConfig, parse } from "diff2html";
 import { LineMatchingType, OutputFormatType } from "diff2html/lib/types";
 import { getViewedFiles, updateViewedFiles } from "./viewed-diff";
+import * as path from "path";
 import * as vscode from "vscode";
 
 export class DiffViewerProvider implements vscode.CustomTextEditorProvider {
@@ -66,18 +67,15 @@ export class DiffViewerProvider implements vscode.CustomTextEditorProvider {
       viewed: boolean;
     }
 
-    const messageReceiverSubscription = webviewPanel.webview.onDidReceiveMessage((message: FileViewedMessage) => {
-      const eol = diffDocument.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
-      const edited = updateViewedFiles(diffDocument.getText(), message.index, message.viewed, eol);
+    interface OpenFileMessage {
+      command: "openFile";
+      path: string;
+      line?: number;
+    }
 
-      oldContent = edited;
+    type Message = FileViewedMessage | OpenFileMessage;
 
-      // just replace the entire document every time; a more complete extension should compute minimal edits instead.
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(diffDocument.uri, new vscode.Range(0, 0, diffDocument.lineCount, 0), edited);
-
-      return vscode.workspace.applyEdit(edit);
-    });
+    const messageReceiverSubscription = webviewPanel.webview.onDidReceiveMessage(handleMessage);
 
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.toString() === diffDocument.uri.toString()) {
@@ -92,6 +90,38 @@ export class DiffViewerProvider implements vscode.CustomTextEditorProvider {
     });
 
     updateWebview();
+
+    function handleMessage(message: Message) {
+      switch (message.command) {
+        case "reportFileViewed":
+          return handleFileViewedMessage(message);
+        case "openFile":
+          return handleOpenFileMessage(message);
+      }
+    }
+
+    function handleFileViewedMessage(message: FileViewedMessage) {
+      const eol = diffDocument.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
+      const edited = updateViewedFiles(diffDocument.getText(), message.index, message.viewed, eol);
+
+      oldContent = edited;
+
+      // just replace the entire document every time; a more complete extension should compute minimal edits instead.
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(diffDocument.uri, new vscode.Range(0, 0, diffDocument.lineCount, 0), edited);
+
+      return vscode.workspace.applyEdit(edit);
+    }
+
+    function handleOpenFileMessage(message: OpenFileMessage) {
+      const filePath = path.join(path.dirname(diffDocument.uri.fsPath), message.path);
+      const uri = vscode.Uri.file(filePath);
+      const options: vscode.TextDocumentShowOptions = {};
+      if (message.line != null) {
+        options.selection = new vscode.Range(message.line - 1, 0, message.line - 1, 0);
+      }
+      vscode.commands.executeCommand("vscode.open", uri, options);
+    }
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {
