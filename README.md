@@ -35,5 +35,5 @@ This code is released under MIT License.
 Check [LICENSE](LICENSE) file for more information.
 
 - test1
-- test2
+- test 2
 - test3
