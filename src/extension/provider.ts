@@ -25,6 +25,7 @@ interface DiffViewerProviderArgs {
 interface WebviewContext {
   document: vscode.TextDocument;
   viewedStateStore: ViewedStateStore;
+  collapsedByDefault: boolean;
   panel: vscode.WebviewPanel;
 }
 
@@ -44,6 +45,10 @@ export class DiffViewerProvider implements vscode.CustomTextEditorProvider {
       }),
       vscode.commands.registerCommand("diffviewer.showLineByLine", () => setOutputFormatConfig("line-by-line")),
       vscode.commands.registerCommand("diffviewer.showSideBySide", () => setOutputFormatConfig("side-by-side")),
+      vscode.commands.registerCommand("diffviewer.openCollapsed", async (file) => {
+        const collapsedUri = vscode.Uri.from({ ...file, query: "collapsed" });
+        await vscode.commands.executeCommand("vscode.openWith", collapsedUri, "diffViewer");
+      }),
     ];
   }
 
@@ -72,6 +77,8 @@ export class DiffViewerProvider implements vscode.CustomTextEditorProvider {
       docId: diffDocument.uri.fsPath,
     });
 
+    const collapsedByDefault = new URLSearchParams(diffDocument.uri.query).has("collapsed");
+
     const messageReceivedHandler = new MessageToExtensionHandlerImpl({
       diffDocument,
       viewedStateStore,
@@ -80,7 +87,12 @@ export class DiffViewerProvider implements vscode.CustomTextEditorProvider {
       },
     });
 
-    const webviewContext: WebviewContext = { document: diffDocument, panel: webviewPanel, viewedStateStore };
+    const webviewContext: WebviewContext = {
+      document: diffDocument,
+      panel: webviewPanel,
+      viewedStateStore,
+      collapsedByDefault,
+    };
 
     this.registerEventHandlers({ webviewContext, messageHandler: messageReceivedHandler });
     this.updateWebview(webviewContext);
@@ -155,6 +167,7 @@ export class DiffViewerProvider implements vscode.CustomTextEditorProvider {
             diffFiles: diffFiles,
             viewedState: viewedState,
             diffContainer: SkeletonElementIds.DiffContainer,
+            collapsedByDefault: webviewContext.collapsedByDefault,
           },
         },
       });
