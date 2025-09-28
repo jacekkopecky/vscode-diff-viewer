@@ -8,7 +8,6 @@ export class MessageToExtensionHandlerImpl implements MessageToExtensionHandler 
     private readonly args: {
       diffDocument: vscode.TextDocument;
       viewedStateStore: ViewedStateStore;
-      collapsedByDefault?: boolean;
       postMessageToWebviewFn: (message: MessageToWebview) => void;
     },
   ) {}
