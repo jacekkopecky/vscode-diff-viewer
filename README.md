@@ -33,3 +33,7 @@ All contributions are welcome, so don't hesitate to submit a pull request. ;-)
 This code is released under MIT License.
 
 Check [LICENSE](LICENSE) file for more information.
+
+- test1
+- test 2
+- test3
